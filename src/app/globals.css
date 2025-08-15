@@ -17,11 +17,16 @@ body {
 }
 
 body {
-  color: var(--foreground);
-  background: var(--background);
-  font-family: Arial, Helvetica, sans-serif;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
+    --text-color: white;
+    --text-color-deemphasized: #8c8c8c;
+    --text-size: 18px;
+
+    background: #01292b;
+    max-width: 800px;
+    margin: 0 auto;
+    color: var(--text-color);
+    font-family: Arial, Helvetica, sans-serif; /* same as mmolb.com */
+    font-size: var(--text-size);
 }
 
 * {
@@ -39,4 +44,14 @@ a {
   html {
     color-scheme: dark;
   }
+}
+
+
+:link {
+    color: var(--text-color);
+    font-weight: bold;
+}
+
+:visited {
+    color: var(--text-color-deemphasized);
 }
