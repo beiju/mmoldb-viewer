@@ -1,0 +1,1 @@
+export const API_BASE = "http://127.0.0.1:42424/api" // process.env.MMOLDB_API_BASE;

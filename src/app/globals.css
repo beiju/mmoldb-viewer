@@ -29,6 +29,10 @@ body {
     font-size: var(--text-size);
 }
 
+body:has(.set-error-background-color) {
+    background: #2b0101;
+}
+
 * {
   box-sizing: border-box;
   padding: 0;
@@ -46,7 +50,6 @@ a {
   }
 }
 
-
 :link {
     color: var(--text-color);
     font-weight: bold;
@@ -54,4 +57,42 @@ a {
 
 :visited {
     color: var(--text-color-deemphasized);
+}
+
+.title {
+    text-align: center;
+    margin: 20px;
+}
+
+.card {
+    background: rgba(0, 0, 0, 0.4);
+    padding: 20px;
+    border-radius: 14px;
+    margin: 20px auto;
+    overflow: hidden; /* To properly cut off border-radius corners */
+}
+
+.card.seamless {
+    padding: 0;
+}
+
+.card.seamless-h {
+    padding-left: 0;
+    padding-right: 0;
+}
+
+.seamless-subhead {
+    padding: 20px 20px 0 20px;
+}
+
+.card > :first-child {
+    margin-top: 0;
+}
+
+.card > :last-child {
+    margin-bottom: 0;
+}
+
+.card p {
+    margin: 1em 0;
 }

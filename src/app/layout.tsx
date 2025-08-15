@@ -1,25 +1,24 @@
 import type { Metadata } from "next";
 import "./globals.css";
 import React from "react";
-import styles from "@/app/page.module.css";
 
 export const metadata: Metadata = {
-  title: "MMOLDB Viewer",
-  description: "by beiju",
+    title: "MMOLDB Viewer",
+    description: "by beiju",
 };
 
 export default function RootLayout({
-  children,
+    children,
 }: Readonly<{
-  children: React.ReactNode;
+    children: React.ReactNode;
 }>) {
-  return (
-    <html lang="en">
-      <body>
-      <h1 className={styles.title}><a href={"/"}>MMOLDB Viewer</a></h1>
+    return (
+        <html lang="en">
+        <body>
+            <h1 className="title"><a href={"/"}>MMOLDB Viewer</a></h1>
 
-      {children}
-      </body>
-    </html>
-  );
+            {children}
+        </body>
+        </html>
+    );
 }
