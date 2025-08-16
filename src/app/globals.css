@@ -33,6 +33,10 @@ body:has(.set-error-background-color) {
     background: #2b0101;
 }
 
+.error {
+    color: red;
+}
+
 * {
   box-sizing: border-box;
   padding: 0;
