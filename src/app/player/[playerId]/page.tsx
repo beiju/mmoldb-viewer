@@ -2,10 +2,11 @@
 
 import styles from "./player.module.css";
 import useSWR from 'swr'
-import { use, useMemo, useState } from "react"
+import { use, useEffect, useMemo, useRef, useState } from "react"
 import { API_BASE } from "@/util/api_base"
 import { swrConfig } from "@/util/swr_config"
 import { Slider } from 'react-compound-slider'
+import { list } from "postcss";
 
 // TODO Offer configuration for which keys are of interest
 const KEYS_OF_INTEREST = [
@@ -165,14 +166,29 @@ function VersionsList({ versions, selectedVersion, setSelectedVersion }: {
     selectedVersion: number,
     setSelectedVersion: (number) => void,
 }) {
+    const listRef = useRef<HTMLUListElement>(null);
     const [isMovingSlider, setIsMovingSlider] = useState<boolean>(false)
+
+    // Select the correct slider every time it becomes active
+    useEffect(() => {
+        if (!listRef) return
+        for (const li of listRef.current.children) {
+            if (parseInt(li.getAttribute("data-version-index"), 10) === selectedVersion) {
+                for (const child of li.children) {
+                    if (child.classList.contains(styles.versionsListSlider)) {
+                        child.focus()
+                    }
+                }
+            }
+        }
+    }, [listRef, selectedVersion])
 
     if (!versions) return null
 
     return (<div
         className={styles.versionsListContainer}
     >
-        <ul className={styles.versionsList}>
+        <ul className={styles.versionsList} ref={listRef}>
             {versions.map((version, idx) => (
                 <li
                     className={styles.versionsListItem}
@@ -204,11 +220,21 @@ function VersionsList({ versions, selectedVersion, setSelectedVersion }: {
                                 }
                             }
                         }}
+                        tabIndex={1} /* necessary for onKeyDown to fire */
+                        onKeyDown={evt => {
+                            console.log(document.activeElement == evt.currentTarget)
+                            if (evt.key === "ArrowDown" && selectedVersion + 1 < versions.length) {
+                                setSelectedVersion(selectedVersion + 1)
+                                evt.preventDefault()
+                            } else if (evt.key === "ArrowUp" && selectedVersion > 0) {
+                                setSelectedVersion(selectedVersion - 1)
+                                evt.preventDefault()
+                            }
+                        }}
                     />
                 </li>
             ))}
         </ul>
-        <div className={styles.versionsListSlider}></div>
     </div>)
 }
 
