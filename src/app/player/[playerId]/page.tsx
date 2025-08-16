@@ -160,7 +160,6 @@ function getMousedOverVersion(evt: MouseEvent) {
 }
 
 function differencesLabel(maybeDifferences: string[] | null): string[] {
-    console.log("Running differences on", maybeDifferences)
     if (maybeDifferences === null) {
         return ["Born"]
     } else if (maybeDifferences.length === 0) {
@@ -169,7 +168,7 @@ function differencesLabel(maybeDifferences: string[] | null): string[] {
 
     let differences = [...maybeDifferences]
 
-    function take(takeDifferences: string[]): boolean {
+    function take(takeDifferences: string[], optionalDifferences: string[] | undefined): boolean {
         if (!differences) throw Error("This should never happen")
         for (const difference of takeDifferences) {
             if (!differences.includes(difference)) {
@@ -183,6 +182,13 @@ function differencesLabel(maybeDifferences: string[] | null): string[] {
             differences.splice(idx, 1)
         }
 
+        if (optionalDifferences) {
+            for (const difference of optionalDifferences) {
+                const idx = differences.indexOf(difference)
+                differences.splice(idx, 1)
+            }
+        }
+
         return true
     }
 
@@ -190,7 +196,7 @@ function differencesLabel(maybeDifferences: string[] | null): string[] {
     while (differences.length > 0) {
         if (take(["slot"])) {
             changes.push("Position swap")
-        } else if (take(["first_name", "last_name"])) {
+        } else if (take(["first_name", "last_name"], ["batting_handedness", "pitching_handedness", "likes", "dislikes", "home", "birthday_type", "birthday_day", "birthday_superstar_day"])) {
             changes.push("Recompose (probably)")
         } else {
             changes.push(...differences)
