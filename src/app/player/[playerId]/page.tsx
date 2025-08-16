@@ -159,6 +159,47 @@ function getMousedOverVersion(evt: MouseEvent) {
     return getVersionFromCoordinates(evt.clientX - 30, evt.clientY)
 }
 
+function differencesLabel(maybeDifferences: string[] | null): string[] {
+    console.log("Running differences on", maybeDifferences)
+    if (maybeDifferences === null) {
+        return ["Born"]
+    } else if (maybeDifferences.length === 0) {
+        return ["Nothing (oops)"]
+    }
+
+    let differences = [...maybeDifferences]
+
+    function take(takeDifferences: string[]): boolean {
+        if (!differences) throw Error("This should never happen")
+        for (const difference of takeDifferences) {
+            if (!differences.includes(difference)) {
+                return false
+            }
+        }
+
+        // If we got this far, then we should remove them
+        for (const difference of takeDifferences) {
+            const idx = differences.indexOf(difference)
+            differences.splice(idx, 1)
+        }
+
+        return true
+    }
+
+    const changes = []
+    while (differences.length > 0) {
+        if (take(["slot"])) {
+            changes.push("Position swap")
+        } else if (take(["first_name", "last_name"])) {
+            changes.push("Recompose (probably)")
+        } else {
+            changes.push(...differences)
+            differences = []
+        }
+    }
+    return changes
+}
+
 function VersionsList({ versions, selectedVersion, setSelectedVersion }: {
     versions: AnnotatedVersion<HasValidity>[] | null,
     selectedVersion: number,
@@ -187,53 +228,76 @@ function VersionsList({ versions, selectedVersion, setSelectedVersion }: {
         className={styles.versionsListContainer}
     >
         <ul className={styles.versionsList} ref={listRef}>
-            {versions.map((version, idx) => (
-                <li
-                    className={styles.versionsListItem}
-                    key={version.data["valid_from"]}
-                    data-version-index={idx}
-                >
-                    {version.differences === null ?
-                        "Born" :
-                        version.differences.length ?
-                            version.differences.join(", ") :
-                            "nothing"
-                    }
-                    <div
-                        className={`${styles.versionsListSlider} ${isMovingSlider ? "" : styles.versionsListSliderActive}`}
-                        hidden={selectedVersion !== idx}
-                        onPointerDown={event => {
-                            // Capture the pointer so we receive the subsequent onPointerUp, regardless
-                            // where it happens
-                            event.currentTarget.setPointerCapture(event.pointerId)
-                            setIsMovingSlider(true)
-                        }}
-                        onPointerUp={() => setIsMovingSlider(false)}
-                        onPointerMove={evt => {
-                            if (isMovingSlider) {
-                                evt.preventDefault()
-                                const newSelection = getMousedOverVersion(evt)
-                                if (isFinite(newSelection)) {
-                                    setSelectedVersion(newSelection)
+            {
+                versions.map((version, idx) => {
+                    const label = differencesLabel(version.differences)
+                    return (<li
+                        className={styles.versionsListItem}
+                        key={version.data["valid_from"]}
+                        data-version-index={idx}
+                    >
+                        {label.join(", ")}
+                        <div
+                            className={`${styles.versionsListSlider} ${isMovingSlider ? "" : styles.versionsListSliderActive}`}
+                            hidden={selectedVersion !== idx}
+                            onPointerDown={event => {
+                                // Capture the pointer so we receive the subsequent onPointerUp, regardless
+                                // where it happens
+                                event.currentTarget.setPointerCapture(event.pointerId)
+                                setIsMovingSlider(true)
+                            }}
+                            onPointerUp={() => setIsMovingSlider(false)}
+                            onPointerMove={evt => {
+                                if (isMovingSlider) {
+                                    evt.preventDefault()
+                                    const newSelection = getMousedOverVersion(evt)
+                                    if (isFinite(newSelection)) {
+                                        setSelectedVersion(newSelection)
+                                    }
                                 }
-                            }
-                        }}
-                        tabIndex={1} /* necessary for onKeyDown to fire */
-                        onKeyDown={evt => {
-                            console.log(document.activeElement == evt.currentTarget)
-                            if (evt.key === "ArrowDown" && selectedVersion + 1 < versions.length) {
-                                setSelectedVersion(selectedVersion + 1)
-                                evt.preventDefault()
-                            } else if (evt.key === "ArrowUp" && selectedVersion > 0) {
-                                setSelectedVersion(selectedVersion - 1)
-                                evt.preventDefault()
-                            }
-                        }}
-                    />
-                </li>
-            ))}
+                            }}
+                            tabIndex={1} /* necessary for onKeyDown to fire */
+                            onKeyDown={evt => {
+                                if (evt.key === "ArrowDown" && selectedVersion + 1 < versions.length) {
+                                    setSelectedVersion(selectedVersion + 1)
+                                    evt.preventDefault()
+                                } else if (evt.key === "ArrowUp" && selectedVersion > 0) {
+                                    setSelectedVersion(selectedVersion - 1)
+                                    evt.preventDefault()
+                                }
+                            }}
+                        />
+                    </li>
+                )}
+            )}
         </ul>
     </div>)
+}
+
+function slotAbbreviation(slot: Slot): string {
+    switch (slot) {
+        case "Catcher": return "C"
+        case "FirstBase": return "1B"
+        case "SecondBase": return "2B"
+        case "ThirdBase": return "3B"
+        case "Shortstop": return "SS"
+        case "LeftField": return "LF"
+        case "CenterField": return "CF"
+        case "RightField": return "RF"
+        case "DesignatedHitter": return "DH"
+        case "StartingPitcher1": return "SP1"
+        case "StartingPitcher2": return "SP2"
+        case "StartingPitcher3": return "SP3"
+        case "StartingPitcher4": return "SP4"
+        case "StartingPitcher5": return "SP5"
+        case "ReliefPitcher1": return "RP1"
+        case "ReliefPitcher2": return "RP2"
+        case "ReliefPitcher3": return "RP3"
+        case "Closer": return "CL"
+        case "StartingPitcher": return "SP"
+        case "ReliefPitcher": return "RP"
+        case "Pitcher": return "P"
+    }
 }
 
 function PlayerDisplay({ player }: { player: AnnotatedVersion<ApiPlayerVersion> | undefined }) {
@@ -243,7 +307,7 @@ function PlayerDisplay({ player }: { player: AnnotatedVersion<ApiPlayerVersion> 
     const [seasonDayStr, seasonDayIsError] = displaySeasonDay(data.birthseason, data.birthday_type, data.birthday_day, data.birthday_superstar_day)
     return (
         <div className={styles.versionDetail}>
-            <h1>{data.first_name} {data.last_name} #{data.number}</h1>
+            <h1>{slotAbbreviation(data.slot)} {data.first_name} {data.last_name} #{data.number}</h1>
             <p className={seasonDayIsError ? "error" : ""}>Born {seasonDayStr}</p>
             <p>From {data.home}</p>
             <p>Bats {data.batting_handedness}</p>
@@ -286,10 +350,12 @@ export default function PlayerVersionsPage({
             } else {
                 const prevVersion = versions[versions.length - 1].data
                 const differences = getDifferingKeysOfInterest(version, prevVersion)
-                versions.push({
-                    data: version,
-                    differences,
-                })
+                if (differences.length > 0) {
+                    versions.push({
+                        data: version,
+                        differences,
+                    })
+                }
             }
         }
         return versions
