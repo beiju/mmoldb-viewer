@@ -138,18 +138,26 @@ function displaySeasonDay(season: number, day_type: DayType | null, day: number 
     return [`Season ${season} ${dayStr}`, error]
 }
 
-function getMousedOverVersion(evt: MouseEvent) {
-    const elementHierarchy = document.elementsFromPoint(evt.clientX, evt.clientY)
+function getVersionFromCoordinates(x: number, y: number): number | undefined {
+    const elementHierarchy = document.elementsFromPoint(x, y)
     for (const element of elementHierarchy) {
         if (element.classList.contains(styles.versionsListItem)) {
             const attr = element.getAttribute("data-version-index")
-            console.log(attr)
             const attrNum = parseInt(attr, 10)
             if (isFinite(attrNum)) {
                 return attrNum
             }
         }
     }
+}
+
+function getMousedOverVersion(evt: MouseEvent) {
+    const version = getVersionFromCoordinates(evt.clientX, evt.clientY)
+    if (isFinite(version)) {
+        return version
+    }
+    // Terrible hack
+    return getVersionFromCoordinates(evt.clientX - 30, evt.clientY)
 }
 
 function VersionsList({ versions, selectedVersion, setSelectedVersion }: {
@@ -161,21 +169,15 @@ function VersionsList({ versions, selectedVersion, setSelectedVersion }: {
 
     if (!versions) return null
 
-    return (<div className={styles.versionsListContainer}>
+    return (<div
+        className={styles.versionsListContainer}
+    >
         <ul className={styles.versionsList}>
             {versions.map((version, idx) => (
                 <li
                     className={styles.versionsListItem}
                     key={version.data["valid_from"]}
                     data-version-index={idx}
-                    onMouseMove={evt => {
-                        if (isMovingSlider) {
-                            const newSelection = getMousedOverVersion(evt)
-                            if (isFinite(newSelection)) {
-                                setSelectedVersion(newSelection)
-                            }
-                        }
-                    }}
                 >
                     {version.differences === null ?
                         "Born" :
@@ -183,25 +185,26 @@ function VersionsList({ versions, selectedVersion, setSelectedVersion }: {
                             version.differences.join(", ") :
                             "nothing"
                     }
-                    {selectedVersion == idx ?
-                        <div
-                            className={`${styles.versionsListSlider} ${isMovingSlider ? "" : styles.versionsListSliderActive}`}
-                            onPointerDown={event => {
-                                // Capture the pointer so we receive the subsequent onPointerUp, regardless
-                                // where it happens
-                                event.currentTarget.setPointerCapture(event.pointerId)
-                                setIsMovingSlider(true)
-                            }}
-                            onPointerUp={() => setIsMovingSlider(false)}
-                            onPointerMove={evt => {
-                                if (isMovingSlider) {
-                                    console.log("Pointer moved in", evt.target)
+                    <div
+                        className={`${styles.versionsListSlider} ${isMovingSlider ? "" : styles.versionsListSliderActive}`}
+                        hidden={selectedVersion !== idx}
+                        onPointerDown={event => {
+                            // Capture the pointer so we receive the subsequent onPointerUp, regardless
+                            // where it happens
+                            event.currentTarget.setPointerCapture(event.pointerId)
+                            setIsMovingSlider(true)
+                        }}
+                        onPointerUp={() => setIsMovingSlider(false)}
+                        onPointerMove={evt => {
+                            if (isMovingSlider) {
+                                evt.preventDefault()
+                                const newSelection = getMousedOverVersion(evt)
+                                if (isFinite(newSelection)) {
+                                    setSelectedVersion(newSelection)
                                 }
-                            }}
-                        />
-                        :
-                        null
-                    }
+                            }
+                        }}
+                    />
                 </li>
             ))}
         </ul>
