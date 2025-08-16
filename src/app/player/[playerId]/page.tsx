@@ -5,8 +5,6 @@ import useSWR from 'swr'
 import { use, useEffect, useMemo, useRef, useState } from "react"
 import { API_BASE } from "@/util/api_base"
 import { swrConfig } from "@/util/swr_config"
-import { Slider } from 'react-compound-slider'
-import { list } from "postcss";
 
 // TODO Offer configuration for which keys are of interest
 const KEYS_OF_INTEREST = [
@@ -43,7 +41,7 @@ type DayType = (
     "Holiday" |
     "Event" |
     "SpecialEvent"
-)
+    )
 type Slot = (
     "Catcher" |
     "FirstBase" |
@@ -66,9 +64,9 @@ type Slot = (
     "StartingPitcher" |
     "ReliefPitcher" |
     "Pitcher"
-)
+    )
 
-type ApiPlayerVersion =  {
+type ApiPlayerVersion = {
     id: string,
     valid_from: string, // TODO a proper date type?
     valid_until: string | null, // TODO a proper date type?
@@ -317,8 +315,9 @@ export default function PlayerVersionsPage({
         {
             playerVersions ? (
                 <section className={styles.versionsContainer}>
-                    <VersionsList versions={playerVersions} selectedVersion={selectedVersion} setSelectedVersion={setSelectedVersion} />
-                    <PlayerDisplay player={playerVersions[selectedVersion]} />
+                    <VersionsList versions={playerVersions} selectedVersion={selectedVersion}
+                                  setSelectedVersion={setSelectedVersion}/>
+                    <PlayerDisplay player={playerVersions[selectedVersion]}/>
                 </section>
             ) : (
                 <section className={styles.versionsContainer}>
