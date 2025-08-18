@@ -1,13 +1,7 @@
 .versionsContainer {
     display: flex;
     min-height: 300px;
-
-    /* Copied from .card */
-    background: rgba(0, 0, 0, 0.4);
-    padding: 20px;
-    border-radius: 14px;
-    margin: 20px auto;
-    overflow: hidden; /* To properly cut off border-radius corners */
+    margin-bottom: 1em;
 }
 
 .versionsListContainer {
@@ -32,7 +26,8 @@
         position: absolute;
         top: 50%;
         right: -15px;
-        margin-top: -0.5px;    }
+        margin-top: -0.5px;
+    }
 }
 
 .versionsListSlider {
@@ -68,4 +63,8 @@
 
 .versionDetail {
     padding-left: 20px;
+
+    li {
+        margin-left: 30px;
+    }
 }

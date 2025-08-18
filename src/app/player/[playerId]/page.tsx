@@ -1,10 +1,11 @@
 'use client'
 
-import styles from "./player.module.css";
+import styles from "./player.module.css"
 import useSWR from 'swr'
 import { use, useEffect, useMemo, useRef, useState } from "react"
 import { API_BASE } from "@/util/api_base"
 import { swrConfig } from "@/util/swr_config"
+import _ from "lodash"
 
 // TODO Offer configuration for which keys are of interest
 const KEYS_OF_INTEREST = [
@@ -24,6 +25,8 @@ const KEYS_OF_INTEREST = [
     "slot",
     "greater_boon",
     "lesser_boon",
+    "modifications",
+    "equipment",
 ]
 
 type Handedness = "Right" | "Left" | "Switch"
@@ -66,6 +69,37 @@ type Slot = (
     "Pitcher"
     )
 
+type ApiModification = {
+    name: string,
+    emoji: string,
+    description: string,
+}
+
+type EffectType = (
+    "Flat" |
+    "Additive" |
+    "Multiplicative"
+)
+
+type ApiEquipmentEffect = {
+    attribute: string,
+    effect_type: EffectType,
+    value: number,
+}
+
+type ApiEquipment = {
+    emoji: string,
+    name: string,
+    special_type: string | null,
+    description: string | null,
+    rare_name: string | null,
+    cost: number | null,
+    prefixes: (string | null)[],
+    suffixes: (string | null)[],
+    rarity: string | null,
+    effects: (ApiEquipmentEffect | null)[],
+}
+
 type ApiPlayerVersion = {
     id: string,
     valid_from: string, // TODO a proper date type?
@@ -85,9 +119,10 @@ type ApiPlayerVersion = {
     mmolb_team_id: string | null,
     slot: Slot | null,
     durability: number,
-    // TODO
-    // pub greater_boon: Option<i64>,
-    // pub lesser_boon: Option<i64>,
+    greater_boon: ApiModification | null,
+    lesser_boon: ApiModification | null,
+    modifications: (ApiModification | null)[],
+    equipment: { [slot: string]: ApiEquipment | null },
 };
 
 type ApiPlayerVersions = {
@@ -142,17 +177,19 @@ function getVersionFromCoordinates(x: number, y: number): number | undefined {
     for (const element of elementHierarchy) {
         if (element.classList.contains(styles.versionsListItem)) {
             const attr = element.getAttribute("data-version-index")
-            const attrNum = parseInt(attr, 10)
-            if (isFinite(attrNum)) {
-                return attrNum
+            if (attr !== null) {
+                const attrNum = parseInt(attr, 10)
+                if (isFinite(attrNum)) {
+                    return attrNum
+                }
             }
         }
     }
 }
 
-function getMousedOverVersion(evt: MouseEvent) {
+function getMousedOverVersion(evt: MouseEvent | PointerEvent) {
     const version = getVersionFromCoordinates(evt.clientX, evt.clientY)
-    if (isFinite(version)) {
+    if (typeof version !== "undefined" && isFinite(version)) {
         return version
     }
     // Terrible hack
@@ -168,7 +205,7 @@ function differencesLabel(maybeDifferences: string[] | null): string[] {
 
     let differences = [...maybeDifferences]
 
-    function take(takeDifferences: string[], optionalDifferences: string[] | undefined): boolean {
+    function take(takeDifferences: string[], optionalDifferences: string[] | undefined = undefined): boolean {
         if (!differences) throw Error("This should never happen")
         for (const difference of takeDifferences) {
             if (!differences.includes(difference)) {
@@ -197,7 +234,11 @@ function differencesLabel(maybeDifferences: string[] | null): string[] {
         if (take(["slot"])) {
             changes.push("Position swap")
         } else if (take(["first_name", "last_name"], ["batting_handedness", "pitching_handedness", "likes", "dislikes", "home", "birthday_type", "birthday_day", "birthday_superstar_day"])) {
-            changes.push("Recompose (probably)")
+            changes.push("Recompose*")
+        } else if (take(["modifications"])) {
+            changes.push("Modifications change")
+        } else if (take(["equipment"])) {
+            changes.push("Equipment change")
         } else {
             changes.push(...differences)
             differences = []
@@ -209,19 +250,22 @@ function differencesLabel(maybeDifferences: string[] | null): string[] {
 function VersionsList({ versions, selectedVersion, setSelectedVersion }: {
     versions: AnnotatedVersion<HasValidity>[] | null,
     selectedVersion: number,
-    setSelectedVersion: (number) => void,
+    setSelectedVersion: (idx: number) => void,
 }) {
     const listRef = useRef<HTMLUListElement>(null);
     const [isMovingSlider, setIsMovingSlider] = useState<boolean>(false)
 
     // Select the correct slider every time it becomes active
     useEffect(() => {
-        if (!listRef) return
+        if (!listRef.current) return
         for (const li of listRef.current.children) {
-            if (parseInt(li.getAttribute("data-version-index"), 10) === selectedVersion) {
-                for (const child of li.children) {
-                    if (child.classList.contains(styles.versionsListSlider)) {
-                        child.focus()
+            const versionIndex = li.getAttribute("data-version-index");
+            if (versionIndex !== null) {
+                if (parseInt(versionIndex, 10) === selectedVersion) {
+                    for (const child of li.children) {
+                        if (child.classList.contains(styles.versionsListSlider)) {
+                            child.focus()
+                        }
                     }
                 }
             }
@@ -280,8 +324,9 @@ function VersionsList({ versions, selectedVersion, setSelectedVersion }: {
     </div>)
 }
 
-function slotAbbreviation(slot: Slot): string {
+function slotAbbreviation(slot: Slot | null): string {
     switch (slot) {
+        case null: return ""
         case "Catcher": return "C"
         case "FirstBase": return "1B"
         case "SecondBase": return "2B"
@@ -306,6 +351,51 @@ function slotAbbreviation(slot: Slot): string {
     }
 }
 
+function ModificationDisplay({ modification }: { modification: ApiModification | null }) {
+    if (!modification) {
+        return <span className={"error"}>Unidentified modification</span>
+    } else {
+        return <span title={modification.description}>{modification.emoji} {modification.name}</span>
+    }
+}
+
+function equipmentNameDisplay(equipment: ApiEquipment): string {
+    const rarityDisplay = equipment.rarity ? ` (${equipment.rarity})` : ""
+    if (equipment.rare_name) {
+        return `${equipment.emoji} ${equipment.rare_name}${rarityDisplay}`
+    } else {
+        return `${equipment.emoji} ${equipment.prefixes.join(" ")} ${equipment.name} ${equipment.suffixes.join(" ")}${rarityDisplay}`
+    }
+}
+
+function effectValueDisplay(effectType: EffectType, effectValue: number): string {
+    // TODO Handle unknown effect type
+    switch (effectType) {
+        case "Flat": return `+${effectValue * 100}`
+        case "Additive": return `+${effectValue * 100}%`
+        case "Multiplicative": return `&times;${effectValue * 100}%`
+    }
+}
+
+function EquipmentDisplay({ slot, equipment }: { slot: string, equipment: ApiEquipment | null }) {
+    return (
+        <div>
+            <p>{slot}: {equipment ? equipmentNameDisplay(equipment) : "Empty"}</p>
+            {equipment && equipment.effects.length > 0 && (
+                <ul>
+                    {equipment.effects.map((effect, i) => (
+                        effect ? (
+                            <li key={i}>{effect.attribute}: {effectValueDisplay(effect.effect_type, effect.value)} {}</li>
+                        ) : (
+                            <li key={i} className="error">Unrecognized equipment effect</li>
+                        )
+                    ))}
+                </ul>
+            )}
+        </div>
+    )
+}
+
 function PlayerDisplay({ player }: { player: AnnotatedVersion<ApiPlayerVersion> | undefined }) {
     if (!player) return null
 
@@ -320,14 +410,32 @@ function PlayerDisplay({ player }: { player: AnnotatedVersion<ApiPlayerVersion> 
             <p>Pitches {data.pitching_handedness}</p>
             <p>Likes {data.likes}</p>
             <p>Dislikes {data.dislikes}</p>
-
+            {data.modifications.length > 0 ? (
+                <>
+                    <p>Modifications: </p>
+                    <ul>
+                        {data.modifications.map((modification, idx) => (
+                            <li key={idx}><ModificationDisplay modification={modification} /></li>
+                        ))}
+                    </ul>
+                </>
+            ) : (
+                <p>No modifications</p>
+            )}
+            {data.greater_boon ? <p>Greater boon: <ModificationDisplay modification={data.greater_boon} /></p> : <p>No greater boon</p>}
+            {data.lesser_boon ? <p>Lesser boon: <ModificationDisplay modification={data.lesser_boon} /></p> : <p>No lesser boon</p>}
+            {Object.entries(data.equipment)
+                .sort(([a,], [b,]) => a < b ? -1 : 1)
+                .map(([slot, equipment], idx) => (
+                        <EquipmentDisplay key={idx} slot={slot} equipment={equipment} />
+                ))}
         </div>
     )
 }
 
 function getDifferingKeysOfInterest(a: object, b: object) {
     return KEYS_OF_INTEREST
-        .filter((key) => a[key] !== b[key])
+        .filter((key) => !_.isEqual(a[key], b[key]))
 }
 
 export default function PlayerVersionsPage({
@@ -386,19 +494,27 @@ export default function PlayerVersionsPage({
     return (<>
         {
             playerVersions ? (
-                <section className={styles.versionsContainer}>
-                    <VersionsList versions={playerVersions} selectedVersion={selectedVersion}
-                                  setSelectedVersion={setSelectedVersion}/>
-                    <PlayerDisplay player={playerVersions[selectedVersion]}/>
-                </section>
+                <div className="card">
+                    <div className={styles.versionsContainer}>
+                        <VersionsList versions={playerVersions} selectedVersion={selectedVersion}
+                                      setSelectedVersion={setSelectedVersion}/>
+                        <PlayerDisplay player={playerVersions[selectedVersion]}/>
+                    </div>
+                    <p className="disclaimer">
+                        * Non-recompose name changes may be mis-detected as Recomposes for now
+                    </p>
+                    <p className="disclaimer">
+                        Coming eventually: Clubhouse reports, augments, stats, and pitcher pitch types
+                    </p>
+                </div>
             ) : (
                 <section className={styles.versionsContainer}>
                     <p>No versions for this player</p>
                 </section>
             )
         }
-        <pre>
-            {JSON.stringify(data, null, 4)}
-        </pre>
+        {/*<pre>*/}
+        {/*    {JSON.stringify(data, null, 4)}*/}
+        {/*</pre>*/}
     </>)
 }

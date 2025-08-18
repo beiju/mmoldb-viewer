@@ -97,6 +97,10 @@ a {
     margin-bottom: 0;
 }
 
-.card p {
-    margin: 1em 0;
+.disclaimer {
+    font-size: 0.9em;
+    color: var(--text-color-deemphasized);
+    text-align: center;
+    font-style: italic;
+    margin: 0.2em 0;
 }
