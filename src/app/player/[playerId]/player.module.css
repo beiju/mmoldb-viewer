@@ -17,6 +17,8 @@
 
 .versionsListItem {
     position: relative; /* so that position: absolute in the ::after is relative to this */
+    margin: 6px 0;
+    cursor: pointer;
 
     &::after {
         content: " ";

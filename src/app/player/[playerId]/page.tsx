@@ -239,6 +239,8 @@ function differencesLabel(maybeDifferences: string[] | null): string[] {
             changes.push("Modifications change")
         } else if (take(["equipment"])) {
             changes.push("Equipment change")
+        } else if (take(["mmolb_team_id"])) {
+            changes.push("Team change")
         } else {
             changes.push(...differences)
             differences = []
@@ -285,6 +287,7 @@ function VersionsList({ versions, selectedVersion, setSelectedVersion }: {
                         className={styles.versionsListItem}
                         key={version.data["valid_from"]}
                         data-version-index={idx}
+                        onClick={() => { setSelectedVersion(idx) }}
                     >
                         {label.join(", ")}
                         <div
