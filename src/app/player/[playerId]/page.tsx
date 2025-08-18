@@ -187,7 +187,7 @@ function getVersionFromCoordinates(x: number, y: number): number | undefined {
     }
 }
 
-function getMousedOverVersion(evt: MouseEvent | PointerEvent) {
+function getMousedOverVersion(evt: { clientX: number; clientY: number }): number | undefined {
     const version = getVersionFromCoordinates(evt.clientX, evt.clientY)
     if (typeof version !== "undefined" && isFinite(version)) {
         return version
@@ -264,7 +264,7 @@ function VersionsList({ versions, selectedVersion, setSelectedVersion }: {
                 if (parseInt(versionIndex, 10) === selectedVersion) {
                     for (const child of li.children) {
                         if (child.classList.contains(styles.versionsListSlider)) {
-                            child.focus()
+                            (child as HTMLElement)?.focus()
                         }
                     }
                 }
@@ -301,8 +301,10 @@ function VersionsList({ versions, selectedVersion, setSelectedVersion }: {
                                 if (isMovingSlider) {
                                     evt.preventDefault()
                                     const newSelection = getMousedOverVersion(evt)
-                                    if (isFinite(newSelection)) {
-                                        setSelectedVersion(newSelection)
+                                    if (typeof newSelection !== "undefined") {
+                                        if (isFinite(newSelection)) {
+                                            setSelectedVersion(newSelection)
+                                        }
                                     }
                                 }
                             }}
@@ -433,7 +435,7 @@ function PlayerDisplay({ player }: { player: AnnotatedVersion<ApiPlayerVersion> 
     )
 }
 
-function getDifferingKeysOfInterest(a: object, b: object) {
+function getDifferingKeysOfInterest(a: Record<string, unknown>, b: Record<string, unknown>) {
     return KEYS_OF_INTEREST
         .filter((key) => !_.isEqual(a[key], b[key]))
 }
