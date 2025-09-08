@@ -248,18 +248,24 @@ function differencesLabel(version: AnnotatedVersion<ApiPlayerVersion>): string[]
         if (optionalDifferences) {
             for (const difference of optionalDifferences) {
                 const idx = differences.indexOf(difference)
-                differences.splice(idx, 1)
+                if (idx >= 0) differences.splice(idx, 1)
             }
         }
 
         return true
     }
 
+    const take_recompose = () => take(
+        ["first_name", "last_name"],
+        ["batting_handedness", "pitching_handedness", "likes", "dislikes", "home",
+            "birthseason", "birthday_type", "birthday_day", "birthday_superstar_day", "reports"]
+    )
+
     const changes = []
     for (const event of version.data.events) {
         if (event.event_type === "Recomposition") {
             // TODO Some sort of error if this `take` returns false
-            take(["first_name", "last_name"], ["batting_handedness", "pitching_handedness", "likes", "dislikes", "home", "birthday_type", "birthday_day", "birthday_superstar_day"])
+            take_recompose()
             if (event.reverts_recomposition === null) {
                 changes.push(`Recomposed into ${event.new_name}`)
             } else if (event.new_name === `${version.prev.data.first_name} ${version.prev.data.last_name}`) {
@@ -273,7 +279,7 @@ function differencesLabel(version: AnnotatedVersion<ApiPlayerVersion>): string[]
     while (differences.length > 0) {
         if (take(["slot"])) {
             changes.push(`Swapped from ${slotAbbreviation(version.prev.data.slot)} to ${slotAbbreviation(version.data.slot)}`)
-        } else if (take(["first_name", "last_name"], ["batting_handedness", "pitching_handedness", "likes", "dislikes", "home", "birthday_type", "birthday_day", "birthday_superstar_day"])) {
+        } else if (take_recompose()) {
             changes.push(`Recomposed into ${version.data.first_name} ${version.data.last_name} (inferred)`)
         } else if (take(["greater_boon"])) {
             if (version.prev.data.greater_boon === null) {
