@@ -26,7 +26,7 @@ const KEYS_OF_INTEREST = [
     "greater_boon",
     "lesser_boon",
     "modifications",
-    "equipment",
+    // "equipment",
     "reports",
 ]
 
@@ -296,7 +296,18 @@ function differencesLabel(version: AnnotatedVersion<ApiPlayerVersion>): string[]
         } else if (take(["equipment"])) {
             changes.push("Equipment changed")
         } else if (take(["reports"])) {
-            changes.push("Reports changed")
+            for (const [category, report] of Object.entries(version.data.reports)) {
+                if (!version.prev.data.reports.hasOwnProperty(category)) {
+                    changes.push(`${category} report generated`)
+                } else if (!_.isEqual(report, version.prev.data.reports[category])) {
+                    changes.push(`${category} report changed`)
+                }
+            }
+            for (const prevCategory of Object.keys(version.prev.data.reports)) {
+                if (!version.data.reports.hasOwnProperty(prevCategory)) {
+                    changes.push(`${prevCategory} report deleted`)
+                }
+            }
         } else if (take(["mmolb_team_id"])) {
             changes.push("Team changed")
         } else {
