@@ -27,6 +27,7 @@ const KEYS_OF_INTEREST = [
     "lesser_boon",
     "modifications",
     "equipment",
+    "reports",
 ]
 
 type Handedness = "Right" | "Left" | "Switch"
@@ -100,6 +101,28 @@ type ApiEquipment = {
     effects: (ApiEquipmentEffect | null)[],
 }
 
+type ApiReportAttribute = {
+    stars: number,
+}
+
+type ApiReport = {
+    season: number | null, // null means not included
+    day_type: DayType | null, // null could mean unrecognized or not included
+    day: number | null,
+    superstar_day: number | null,
+    quote: string,
+    attributes: { [attribute: string]: ApiReportAttribute | null },
+}
+
+type ApiRecompositionEvent = {
+    event_type: "Recomposition",
+    time: string,
+    new_name: string,
+    reverts_recomposition: string | null,
+}
+
+type ApiEvent = ApiRecompositionEvent
+
 type ApiPlayerVersion = {
     id: string,
     valid_from: string, // TODO a proper date type?
@@ -123,6 +146,8 @@ type ApiPlayerVersion = {
     lesser_boon: ApiModification | null,
     modifications: (ApiModification | null)[],
     equipment: { [slot: string]: ApiEquipment | null },
+    reports: { [category: string]: ApiReport | null },
+    events: ApiEvent[]
 };
 
 type ApiPlayerVersions = {
@@ -138,13 +163,14 @@ async function playerVersionsFetcher(playerId: string): Promise<ApiPlayerVersion
     return await response.json()
 }
 
-type AnnotatedVersion<V> = {
+type AnnotatedVersionPrev<V> = {
     data: V,
-    differences: string[] | null,
+    differences: string[],
 }
 
-interface HasValidity {
-    valid_from: string;
+type AnnotatedVersion<V> = {
+    data: V,
+    prev: AnnotatedVersionPrev<V> | null,
 }
 
 function displayDay(day_type: DayType | null, day: number | null, superstar_day: number | null): [string, boolean] {
@@ -196,14 +222,14 @@ function getMousedOverVersion(evt: { clientX: number; clientY: number }): number
     return getVersionFromCoordinates(evt.clientX - 30, evt.clientY)
 }
 
-function differencesLabel(maybeDifferences: string[] | null): string[] {
-    if (maybeDifferences === null) {
-        return ["Born"]
-    } else if (maybeDifferences.length === 0) {
+function differencesLabel(version: AnnotatedVersion<ApiPlayerVersion>): string[] {
+    if (version.prev === null) {
+        return [`Born ${version.data.first_name} ${version.data.last_name}`]
+    } else if (version.prev.differences.length === 0) {
         return ["Nothing (oops)"]
     }
 
-    let differences = [...maybeDifferences]
+    let differences = [...version.prev.differences]
 
     function take(takeDifferences: string[], optionalDifferences: string[] | undefined = undefined): boolean {
         if (!differences) throw Error("This should never happen")
@@ -230,17 +256,49 @@ function differencesLabel(maybeDifferences: string[] | null): string[] {
     }
 
     const changes = []
+    for (const event of version.data.events) {
+        if (event.event_type === "Recomposition") {
+            // TODO Some sort of error if this `take` returns false
+            take(["first_name", "last_name"], ["batting_handedness", "pitching_handedness", "likes", "dislikes", "home", "birthday_type", "birthday_day", "birthday_superstar_day"])
+            if (event.reverts_recomposition === null) {
+                changes.push(`Recomposed into ${event.new_name}`)
+            } else if (event.new_name === `${version.prev.data.first_name} ${version.prev.data.last_name}`) {
+                changes.push(`Recomposed attributes reverted`)
+            } else {
+                changes.push(`Unrecomposed back to ${event.new_name}`)
+            }
+        }
+    }
+
     while (differences.length > 0) {
         if (take(["slot"])) {
-            changes.push("Position swap")
+            changes.push(`Swapped from ${slotAbbreviation(version.prev.data.slot)} to ${slotAbbreviation(version.data.slot)}`)
         } else if (take(["first_name", "last_name"], ["batting_handedness", "pitching_handedness", "likes", "dislikes", "home", "birthday_type", "birthday_day", "birthday_superstar_day"])) {
-            changes.push("Recompose*")
+            changes.push(`Recomposed into ${version.data.first_name} ${version.data.last_name} (inferred)`)
+        } else if (take(["greater_boon"])) {
+            if (version.prev.data.greater_boon === null) {
+                changes.push("Gained greater boon")
+            } else if (version.data.greater_boon === null) {
+                changes.push("Lost greater boon")
+            } else {
+                changes.push("Replaced greater boon")
+            }
+        } else if (take(["lesser_boon"])) {
+            if (version.prev.data.lesser_boon === null) {
+                changes.push("Gained lesser boon")
+            } else if (version.data.lesser_boon === null) {
+                changes.push("Lost lesser boon")
+            } else {
+                changes.push("Replaced lesser boon")
+            }
         } else if (take(["modifications"])) {
-            changes.push("Modifications change")
+            changes.push("Modifications changed")
         } else if (take(["equipment"])) {
-            changes.push("Equipment change")
+            changes.push("Equipment changed")
+        } else if (take(["reports"])) {
+            changes.push("Reports changed")
         } else if (take(["mmolb_team_id"])) {
-            changes.push("Team change")
+            changes.push("Team changed")
         } else {
             changes.push(...differences)
             differences = []
@@ -250,7 +308,7 @@ function differencesLabel(maybeDifferences: string[] | null): string[] {
 }
 
 function VersionsList({ versions, selectedVersion, setSelectedVersion }: {
-    versions: AnnotatedVersion<HasValidity>[] | null,
+    versions: AnnotatedVersion<ApiPlayerVersion>[] | null,
     selectedVersion: number,
     setSelectedVersion: (idx: number) => void,
 }) {
@@ -282,7 +340,7 @@ function VersionsList({ versions, selectedVersion, setSelectedVersion }: {
         <ul className={styles.versionsList} ref={listRef}>
             {
                 versions.map((version, idx) => {
-                    const label = differencesLabel(version.differences)
+                    const label = differencesLabel(version)
                     return (<li
                         className={styles.versionsListItem}
                         key={version.data["valid_from"]}
@@ -376,9 +434,9 @@ function equipmentNameDisplay(equipment: ApiEquipment): string {
 function effectValueDisplay(effectType: EffectType, effectValue: number): string {
     // TODO Handle unknown effect type
     switch (effectType) {
-        case "Flat": return `+${effectValue * 100}`
-        case "Additive": return `+${effectValue * 100}%`
-        case "Multiplicative": return `&times;${effectValue * 100}%`
+        case "Flat": return `+${(effectValue * 100).toFixed(0)}`
+        case "Additive": return `+${(effectValue * 100).toFixed(0)}%`
+        case "Multiplicative": return `&times;${(effectValue * 100).toFixed(0)}%`
     }
 }
 
@@ -398,6 +456,55 @@ function EquipmentDisplay({ slot, equipment }: { slot: string, equipment: ApiEqu
                 </ul>
             )}
         </div>
+    )
+}
+
+function ReportDisplay({ category, report }: { category: string, report: ApiReport | null }) {
+    if (!report) {
+        return (
+            <div>{category}: Empty</div>
+        )
+    }
+
+    // This will display nothing if `season` is null but `day_type` isn't.
+    // Not sure what should be done in that case.
+    let seasonDisplay = null;
+    if (report.season !== null) {
+        const [seasonDayStr, seasonDayIsError] = displaySeasonDay(report.season, report.day_type, report.day, report.superstar_day)
+        seasonDisplay = (<p className={seasonDayIsError ? "error" : ""}>Report generated {seasonDayStr}</p>)
+    }
+
+    return (
+        <div>
+            <p>{category}: {report ? "" : "Empty"}</p>
+            {report && (
+                <div>
+                    {seasonDisplay}
+                    <p>&ldquo;{report.quote}&rdquo;</p>
+                    {Object.entries(report.attributes).length > 0 && (
+                        <ul>
+                            {Object.entries(report.attributes)
+                                .sort(([a,], [b,]) => a < b ? -1 : 1)
+                                .map(([attr, attribute], idx) => (
+                                    <ReportAttributeDisplay key={idx} attr={attr} attribute={attribute} />
+                                ))}
+                        </ul>
+                    )}
+                </div>
+            )}
+        </div>
+    )
+}
+
+function ReportAttributeDisplay({ attr, attribute }: { attr: string, attribute: ApiReportAttribute | null }) {
+    if (!attribute) {
+        return (
+            <li>{attr}: Empty</li>
+        )
+    }
+
+    return (
+        <li>{attr}: {attribute.stars} stars</li>
     )
 }
 
@@ -434,6 +541,12 @@ function PlayerDisplay({ player }: { player: AnnotatedVersion<ApiPlayerVersion> 
                 .map(([slot, equipment], idx) => (
                         <EquipmentDisplay key={idx} slot={slot} equipment={equipment} />
                 ))}
+            {Object.entries(data.reports)
+                .sort(([a,], [b,]) => a < b ? -1 : 1)
+                .map(([category, report], idx) => (
+                        <ReportDisplay key={idx} category={category} report={report} />
+                ))}
+            {/*<pre>{ JSON.stringify(player, null, 2) }</pre>*/}
         </div>
     )
 }
@@ -464,15 +577,20 @@ export default function PlayerVersionsPage({
             if (versions.length < 1) {
                 versions.push({
                     data: version,
+                    prev: null,
+                    prevData: null,
                     differences: null,
                 })
             } else {
-                const prevVersion = versions[versions.length - 1].data
+                const prevVersion: ApiPlayerVersion = versions[versions.length - 1].data
                 const differences = getDifferingKeysOfInterest(version, prevVersion)
                 if (differences.length > 0) {
                     versions.push({
                         data: version,
-                        differences,
+                        prev: {
+                            data: prevVersion,
+                            differences,
+                        }
                     })
                 }
             }
@@ -502,8 +620,8 @@ export default function PlayerVersionsPage({
                 <div className="card">
                     <div className={styles.versionsContainer}>
                         <VersionsList versions={playerVersions} selectedVersion={selectedVersion}
-                                      setSelectedVersion={setSelectedVersion}/>
-                        <PlayerDisplay player={playerVersions[selectedVersion]}/>
+                                      setSelectedVersion={setSelectedVersion} />
+                        <PlayerDisplay player={playerVersions[selectedVersion]} />
                     </div>
                     <p className="disclaimer">
                         * Non-recompose name changes may be mis-detected as Recomposes for now
