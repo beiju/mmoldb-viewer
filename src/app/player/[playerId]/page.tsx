@@ -27,7 +27,7 @@ const KEYS_OF_INTEREST = [
     "greater_boon",
     "lesser_boon",
     "modifications",
-    // "equipment",
+    "equipment",
     "reports",
 ]
 
@@ -452,7 +452,7 @@ function ModificationDisplay({ modification, prev_modification, modificationType
     // Display the current version if it's non-null, or the prev version if it is null
     const mod = modification || prev_modification
     if (!mod) {
-        return <div className={`${styles.emptyBoon} ${styles.versionUnitOfChange}`}>No {modificationType}</div>
+        return <div className={`${styles.emptyUnit} ${styles.versionUnitOfChange}`}>No {modificationType}</div>
     } else {
         return (
             <div className={`${styles.boon} ${styles.versionUnitOfChange} ${changeClass(modification, prev_modification)}`}>
@@ -481,29 +481,43 @@ function effectValueDisplay(effectType: EffectType, effectValue: number): string
     }
 }
 
-function EquipmentDisplay({ slot, equipment }: { slot: string, equipment: ApiEquipment | null }) {
+function EquipmentDisplay({ slot, equipment, prevEquipment }: {
+    slot: string,
+    equipment: ApiEquipment | null,
+    prevEquipment: ApiEquipment | null,
+}) {
+    const equip = equipment || prevEquipment
     return (
         <div>
-            <p>{slot}: {equipment ? equipmentNameDisplay(equipment) : "Empty"}</p>
-            {equipment && equipment.effects.length > 0 && (
-                <ul>
-                    {equipment.effects.map((effect, i) => (
-                        effect ? (
-                            <li key={i}>{effect.attribute}: {effectValueDisplay(effect.effect_type, effect.value)} {}</li>
-                        ) : (
-                            <li key={i} className="error">Unrecognized equipment effect</li>
-                        )
-                    ))}
-                </ul>
-            )}
+            <h2 className={styles.unitLabel}>{slot}</h2>
+            <div className={`${styles.versionUnitOfChange} ${changeClass(equipment, prevEquipment)} ${equip ? "" : styles.emptyUnit}`}>
+                <p>{equip ? equipmentNameDisplay(equip) : "Empty"}</p>
+                {equip && equip.effects.length > 0 && (
+                    <ul>
+                        {equip.effects.map((effect, i) => (
+                            effect ? (
+                                <li key={i}>{effect.attribute}: {effectValueDisplay(effect.effect_type, effect.value)} {}</li>
+                            ) : (
+                                <li key={i} className="error">Unrecognized equipment effect</li>
+                            )
+                        ))}
+                    </ul>
+                )}
+            </div>
         </div>
     )
 }
 
-function ReportDisplay({ category, report }: { category: string, report: ApiReport | null }) {
+function ReportDisplay({ category, report, prevReport }: {
+    category: string,
+    report: ApiReport | null,
+    prevReport: ApiReport | null,
+}) {
     if (!report) {
         return (
-            <div>{category}: Empty</div>
+            <div className={`${styles.versionUnitOfChange} ${styles.emptyUnit}`}>
+                {category} report empty
+            </div>
         )
     }
 
@@ -512,40 +526,106 @@ function ReportDisplay({ category, report }: { category: string, report: ApiRepo
     let seasonDisplay = null;
     if (report.season !== null) {
         const [seasonDayStr, seasonDayIsError] = displaySeasonDay(report.season, report.day_type, report.day, report.superstar_day)
-        seasonDisplay = (<p className={seasonDayIsError ? "error" : ""}>Report generated {seasonDayStr}</p>)
+        seasonDisplay = (<p className={seasonDayIsError ? "error" : ""}>Report generated during {seasonDayStr}</p>)
     }
 
+    const reportChangeClass = changeClass(
+        report ? _.omit(report, ["attributes"]) : null,
+        prevReport ? _.omit(prevReport, ["attributes"]) : null,
+    )
+
+    const matchedReports = _.uniq(_.flatten([
+        report ? Object.keys(report.attributes) : [],
+        prevReport ? Object.keys(prevReport.attributes) : [],
+    ])).sort()
+
     return (
-        <div>
-            <p>{category}: {report ? "" : "Empty"}</p>
-            {report && (
-                <div>
-                    {seasonDisplay}
-                    <p>&ldquo;{report.quote}&rdquo;</p>
-                    {Object.entries(report.attributes).length > 0 && (
-                        <ul>
-                            {Object.entries(report.attributes)
-                                .sort(([a,], [b,]) => a < b ? -1 : 1)
-                                .map(([attr, attribute], idx) => (
-                                    <ReportAttributeDisplay key={idx} attr={attr} attribute={attribute} />
-                                ))}
-                        </ul>
-                    )}
-                </div>
+        <div className={`${styles.versionUnitOfChange} ${reportChangeClass}`}>
+            {seasonDisplay}
+            <p>&ldquo;{report.quote}&rdquo;</p>
+            {Object.entries(report.attributes).length > 0 && (
+                <table className={styles.attributesTable}>
+                    <tbody>
+                        {matchedReports
+                            .map((attr, idx) => (
+                                <ReportAttributeDisplay
+                                    key={idx}
+                                    attr={attr}
+                                    attribute={report ? report.attributes[attr] : null}
+                                    prevAttribute={prevReport ? prevReport.attributes[attr] : null} />
+                            ))}
+                    </tbody>
+                </table>
             )}
         </div>
     )
 }
 
-function ReportAttributeDisplay({ attr, attribute }: { attr: string, attribute: ApiReportAttribute | null }) {
-    if (!attribute) {
+function starsGroupClassName(i: number) {
+    if (i < 4) {
+        return styles.starsGroup1
+    } else if (i < 8) {
+        return styles.starsGroup2
+    } else if (i < 12) {
+        return styles.starsGroup3
+    } else if (i < 16) {
+        return styles.starsGroup4
+    } else if (i < 20) {
+        return styles.starsGroup5
+    }
+    return ""
+}
+
+function ReportAttributeDisplay({ attr, attribute, prevAttribute }: {
+    attr: string,
+    attribute: ApiReportAttribute | null,
+    prevAttribute: ApiReportAttribute | null,
+}) {
+    let numUnstyledStars
+    if (attribute !== null && prevAttribute !== null) {
+        numUnstyledStars = Math.min(attribute.stars, prevAttribute.stars)
+    } else if (attribute !== null) {
+        numUnstyledStars = attribute.stars
+    } else if (prevAttribute !== null) {
+        numUnstyledStars = prevAttribute.stars
+    } else {
         return (
-            <li>{attr}: Empty</li>
+            <tr>
+                <td className={styles.attributeLabel}>{attr}</td>
+                <td className={styles.starsUnknown}>Unknown</td>
+            </tr>
         )
     }
 
+    const starsDisplay = []
+    for (let i = 0; i < numUnstyledStars; i++) {
+        starsDisplay.push(
+            <span key={i} className={`${starsGroupClassName(i)}`}>★</span>
+        )
+    }
+    if (attribute && attribute.stars > numUnstyledStars) {
+        const starsInside = []
+        for (let i = numUnstyledStars; i < attribute.stars; i++) {
+            starsInside.push(
+                <span key={i} className={`${starsGroupClassName(i)}`}>★</span>
+            )
+        }
+        starsDisplay.push(<span key={numUnstyledStars} className={styles.starsAdded}>{starsInside}</span>)
+    }
+    if (prevAttribute && prevAttribute.stars > numUnstyledStars) {
+        const starsInside = []
+        for (let i = numUnstyledStars; i < prevAttribute.stars; i++) {
+            starsInside.push(<span key={i} className={`${starsGroupClassName(i)}`}>☆</span>
+            )
+        }
+        starsDisplay.push(<span key={numUnstyledStars} className={styles.starsRemoved}>{starsInside}</span>)
+    }
+
     return (
-        <li>{attr}: {attribute.stars} stars</li>
+        <tr>
+            <td className={styles.attributeLabel}>{attr}</td>
+            <td className={styles.stars}>{starsDisplay}</td>
+        </tr>
     )
 }
 
@@ -597,6 +677,8 @@ function PlayerDisplay({ player }: { player: AnnotatedVersion<ApiPlayerVersion> 
     }
 
     const matchedModifications = zipMatching(player.data.modifications, player.prev?.data.modifications ?? [])
+    const matchedEquipment = _.uniq([...Object.keys(data.equipment), ...Object.keys(player.prev?.data.equipment ?? [])]).sort()
+    const matchedReports = _.uniq([...Object.keys(data.reports), ...Object.keys(player.prev?.data.reports ?? [])]).sort()
 
     return (
         <div className={styles.versionDetail}>
@@ -634,8 +716,8 @@ function PlayerDisplay({ player }: { player: AnnotatedVersion<ApiPlayerVersion> 
                     <ModificationDisplay
                         key={i}
                         modificationType="modifications"
-                        modification={a}
-                        prev_modification={b} />
+                        modification={a ?? null}
+                        prev_modification={b ?? null} />
                 )) : (
                     <ModificationDisplay
                         modificationType="modifications"
@@ -644,16 +726,24 @@ function PlayerDisplay({ player }: { player: AnnotatedVersion<ApiPlayerVersion> 
 
                 )}
             </div>
-            {Object.entries(data.equipment)
-                .sort(([a,], [b,]) => a < b ? -1 : 1)
-                .map(([slot, equipment], idx) => (
-                        <EquipmentDisplay key={idx} slot={slot} equipment={equipment} />
+            <div className={styles.sideways}>
+                {matchedEquipment.map((slot, idx) => (
+                    <EquipmentDisplay
+                        key={idx}
+                        slot={slot}
+                        equipment={data.equipment[slot] ?? null}
+                        prevEquipment={player.prev ? player.prev.data.equipment[slot] ?? null : null} />
                 ))}
-            {Object.entries(data.reports)
-                .sort(([a,], [b,]) => a < b ? -1 : 1)
-                .map(([category, report], idx) => (
-                        <ReportDisplay key={idx} category={category} report={report} />
-                ))}
+            </div>
+            {matchedReports.map((category, idx) => (
+                <div key={idx}>
+                    <h2 className={styles.unitLabel}>{category}</h2>
+                    <ReportDisplay
+                        category={category}
+                        report={data.reports[category] ?? null}
+                        prevReport={player.prev ? player.prev.data.reports[category] ?? null : null} />
+                </div>
+            ))}
             {/*<pre>{ JSON.stringify(player, null, 2) }</pre>*/}
         </div>
     )
@@ -686,8 +776,6 @@ export default function PlayerVersionsPage({
                 versions.push({
                     data: version,
                     prev: null,
-                    prevData: null,
-                    differences: null,
                 })
             } else {
                 const prevVersion: ApiPlayerVersion = versions[versions.length - 1].data
