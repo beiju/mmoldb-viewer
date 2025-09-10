@@ -361,6 +361,14 @@ function VersionsList({ versions, selectedVersion, setSelectedVersion }: {
 }) {
     const listRef = useRef<HTMLUListElement>(null);
     const [isMovingSlider, setIsMovingSlider] = useState<boolean>(false)
+    const [blockClick, setBlockClick] = useState<boolean>(false)
+
+    // automatically clear blockClick after a short time
+    useEffect(() => {
+        if (blockClick) {
+            setTimeout(() => setBlockClick(false), 100)
+        }
+    }, [blockClick])
 
     // Select the correct slider every time it becomes active
     useEffect(() => {
@@ -392,7 +400,11 @@ function VersionsList({ versions, selectedVersion, setSelectedVersion }: {
                         className={styles.versionsListItem}
                         key={version.data["valid_from"]}
                         data-version-index={idx}
-                        onClick={() => { setSelectedVersion(idx) }}
+                        onClick={() => { {
+                            if (!isMovingSlider && !blockClick) {
+                                setSelectedVersion(idx)
+                            }
+                        }}}
                     >
                         {label.map((l, i) => <p key={i}>{l}</p>)}
                         <div
@@ -404,7 +416,17 @@ function VersionsList({ versions, selectedVersion, setSelectedVersion }: {
                                 event.currentTarget.setPointerCapture(event.pointerId)
                                 setIsMovingSlider(true)
                             }}
-                            onPointerUp={() => setIsMovingSlider(false)}
+                            onPointerUp={evt => {
+                                if (isMovingSlider) {
+                                    evt.stopPropagation()
+                                    evt.preventDefault()
+                                    // Unfortunately I can't figure out any other way to not have
+                                    // the click event fire after a drag ends
+                                    setBlockClick(true)
+                                    setIsMovingSlider(false)
+                                }
+                            }}
+                            onPointerCancel={() => setIsMovingSlider(false)}
                             onPointerMove={evt => {
                                 if (isMovingSlider) {
                                     evt.preventDefault()
