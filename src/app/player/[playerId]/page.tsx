@@ -8,6 +8,8 @@ import { swrConfig } from "@/util/swr_config"
 import _ from "lodash"
 import { diffArrays } from "diff"
 
+const REPORTS_STARTED_LIVE_UPDATING = "2025-08-02T23:54:00.000Z"
+
 // TODO Offer configuration for which keys are of interest
 const KEYS_OF_INTEREST = [
     "first_name",
@@ -122,7 +124,20 @@ type ApiRecompositionEvent = {
     reverts_recomposition: string | null,
 }
 
-type ApiEvent = ApiRecompositionEvent
+type ApiAttributeAugmentEvent = {
+    event_type: "AttributeAugment",
+    time: string,
+    attribute: string,
+    value: number,
+}
+
+type ApiPartyEvent = {
+    event_type: "Party",
+    attribute: string,
+    value: number,
+}
+
+type ApiEvent = ApiRecompositionEvent | ApiAttributeAugmentEvent | ApiPartyEvent
 
 type ApiPlayerVersion = {
     id: string,
@@ -263,6 +278,12 @@ function differencesLabel(version: AnnotatedVersion<ApiPlayerVersion>): string[]
     )
 
     const changes = []
+
+    // Label when reports started updating live because otherwise it's confusing
+    if (version.data.valid_from >= REPORTS_STARTED_LIVE_UPDATING && version.prev && version.prev.data.valid_from < REPORTS_STARTED_LIVE_UPDATING) {
+        changes.push("Reports begin to update live")
+    }
+
     for (const event of version.data.events) {
         if (event.event_type === "Recomposition") {
             // TODO Some sort of error if this `take` returns false
@@ -274,6 +295,14 @@ function differencesLabel(version: AnnotatedVersion<ApiPlayerVersion>): string[]
             } else {
                 changes.push(`Unrecomposed back to ${event.new_name}`)
             }
+        } else if (event.event_type === "AttributeAugment") {
+            // TODO Some sort of error if this `take` returns false
+            take(["reports"])
+            changes.push(`Augment: +${event.value} ${event.attribute}`)
+        } else if (event.event_type === "Party") {
+            // TODO Some sort of error if this `take` returns false
+            take(["reports"])
+            changes.push(`Party: +${event.value} ${event.attribute}`)
         }
     }
 
@@ -365,7 +394,7 @@ function VersionsList({ versions, selectedVersion, setSelectedVersion }: {
                         data-version-index={idx}
                         onClick={() => { setSelectedVersion(idx) }}
                     >
-                        {label.join(", ")}
+                        {label.map((l, i) => <p key={i}>{l}</p>)}
                         <div
                             className={`${styles.versionsListSlider} ${isMovingSlider ? "" : styles.versionsListSliderActive}`}
                             hidden={selectedVersion !== idx}
@@ -551,8 +580,8 @@ function ReportDisplay({ category, report, prevReport }: {
                                 <ReportAttributeDisplay
                                     key={idx}
                                     attr={attr}
-                                    attribute={report ? report.attributes[attr] : null}
-                                    prevAttribute={prevReport ? prevReport.attributes[attr] : null} />
+                                    attribute={report ? report.attributes[attr] ?? null: null}
+                                    prevAttribute={prevReport ? prevReport.attributes[attr] ?? null : null} />
                             ))}
                     </tbody>
                 </table>
@@ -820,10 +849,8 @@ export default function PlayerVersionsPage({
                         <PlayerDisplay player={playerVersions[selectedVersion]} />
                     </div>
                     <p className="disclaimer">
-                        * Non-recompose name changes may be mis-detected as Recomposes for now
-                    </p>
-                    <p className="disclaimer">
-                        Coming eventually: Clubhouse reports, augments, stats, and pitcher pitch types
+                        Note: feed-event-to-player-version matching is imperfect. Some changes may be displayed
+                        under the wrong version header.
                     </p>
                 </div>
             ) : (
