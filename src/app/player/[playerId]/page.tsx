@@ -6,6 +6,7 @@ import { use, useEffect, useMemo, useRef, useState } from "react"
 import { API_BASE } from "@/util/api_base"
 import { swrConfig } from "@/util/swr_config"
 import _ from "lodash"
+import { diffArrays } from "diff"
 
 // TODO Offer configuration for which keys are of interest
 const KEYS_OF_INTEREST = [
@@ -431,11 +432,34 @@ function slotAbbreviation(slot: Slot | null): string {
     }
 }
 
-function ModificationDisplay({ modification }: { modification: ApiModification | null }) {
-    if (!modification) {
-        return <span className={"error"}>Unidentified modification</span>
+function changeClass<T>(current: T | null, prev: T | null): string {
+    if (current === null && prev !== null) {
+        return styles.removed
+    } else if (current !== null && prev === null) {
+        return styles.added
+    } else if (!_.isEqual(current, prev)) {
+        return styles.changed
     } else {
-        return <span title={modification.description}>{modification.emoji} {modification.name}</span>
+        return ""
+    }
+}
+
+function ModificationDisplay({ modification, prev_modification, modificationType }: {
+    modification: ApiModification | null,
+    prev_modification: ApiModification | null | undefined,
+    modificationType: string | null,
+}) {
+    // Display the current version if it's non-null, or the prev version if it is null
+    const mod = modification || prev_modification
+    if (!mod) {
+        return <div className={`${styles.emptyBoon} ${styles.versionUnitOfChange}`}>No {modificationType}</div>
+    } else {
+        return (
+            <div className={`${styles.boon} ${styles.versionUnitOfChange} ${changeClass(modification, prev_modification)}`}>
+                <h3>{mod.emoji} {mod.name}</h3>
+                <p className={styles.btw}>{mod.description}</p>
+            </div>
+        )
     }
 }
 
@@ -525,34 +549,101 @@ function ReportAttributeDisplay({ attr, attribute }: { attr: string, attribute: 
     )
 }
 
+function zipMatching<T>(a: T[], b: T[]): [T | null, T | null][] {
+    const output: [T | null, T | null][] = []
+    const changes = diffArrays(a, b, { comparator: _.isEqual })
+
+    for (const change of changes) {
+        if (change.added) {
+            // Then b has it but a doesn't
+            for (const value of change.value) {
+                output.push([null, value])
+            }
+        } else if (change.removed) {
+            // Then a has it but b doesn't
+            for (const value of change.value) {
+                output.push([value, null])
+            }
+        } else {
+            // Then both have it
+            for (const value of change.value) {
+                output.push([value, value])
+            }
+        }
+    }
+
+    return output
+}
+
 function PlayerDisplay({ player }: { player: AnnotatedVersion<ApiPlayerVersion> | undefined }) {
     if (!player) return null
 
     const { data } = player
     const [seasonDayStr, seasonDayIsError] = displaySeasonDay(data.birthseason, data.birthday_type, data.birthday_day, data.birthday_superstar_day)
+
+    // TODO This is pretty redundant with the changes detection in VersionsList
+    const changes = {
+        slot: player.prev && player.data.slot !== player.prev.data.slot,
+        identity: player.prev && (
+            player.data.first_name !== player.prev.data.first_name ||
+                player.data.last_name !== player.prev.data.last_name ||
+                player.data.number !== player.prev.data.number ||
+                player.data.home !== player.prev.data.home ||
+                player.data.likes !== player.prev.data.likes ||
+                player.data.dislikes !== player.prev.data.dislikes ||
+                player.data.batting_handedness !== player.prev.data.batting_handedness ||
+                player.data.pitching_handedness !== player.prev.data.pitching_handedness
+        )
+    }
+
+    const matchedModifications = zipMatching(player.data.modifications, player.prev?.data.modifications ?? [])
+
     return (
         <div className={styles.versionDetail}>
-            <h1>{slotAbbreviation(data.slot)} {data.first_name} {data.last_name} #{data.number}</h1>
-            <p className={seasonDayIsError ? "error" : ""}>Born {seasonDayStr}</p>
-            <p>From {data.home}</p>
-            <p>Bats {data.batting_handedness}</p>
-            <p>Pitches {data.pitching_handedness}</p>
-            <p>Likes {data.likes}</p>
-            <p>Dislikes {data.dislikes}</p>
-            {data.modifications.length > 0 ? (
-                <>
-                    <p>Modifications: </p>
-                    <ul>
-                        {data.modifications.map((modification, idx) => (
-                            <li key={idx}><ModificationDisplay modification={modification} /></li>
-                        ))}
-                    </ul>
-                </>
-            ) : (
-                <p>No modifications</p>
-            )}
-            {data.greater_boon ? <p>Greater boon: <ModificationDisplay modification={data.greater_boon} /></p> : <p>No greater boon</p>}
-            {data.lesser_boon ? <p>Lesser boon: <ModificationDisplay modification={data.lesser_boon} /></p> : <p>No lesser boon</p>}
+            <div className={`${styles.versionUnitOfChange} ${changes.identity ? styles.changed : ""}`}>
+                <h1 className={styles.containsInsetUnitOfChange}>
+                    <span className={`${styles.insetUnitOfChange} ${changes.slot ? styles.changed : ""} ${changes.identity && !changes.slot ? styles.unchangedInsetInsideChangedContainer : ""}`}>
+                        {slotAbbreviation(data.slot)}
+                    </span>
+                    {data.first_name} {data.last_name} #{data.number}
+                </h1>
+                <p className={seasonDayIsError ? "error" : ""}>Born during {seasonDayStr}</p>
+                <p>From {data.home}</p>
+                <p>Likes {data.likes}</p>
+                <p>Dislikes {data.dislikes}</p>
+                <p>Bats {data.batting_handedness}</p>
+                <p>Pitches {data.pitching_handedness}</p>
+            </div>
+            <div>
+                <h2 className={styles.unitLabel}>Greater boon</h2>
+                <ModificationDisplay
+                    modificationType="greater boon"
+                    modification={data.greater_boon}
+                    prev_modification={player.prev?.data.greater_boon} />
+            </div>
+            <div>
+                <h2 className={styles.unitLabel}>Lesser boon</h2>
+                <ModificationDisplay
+                    modificationType="lesser boon"
+                    modification={data.lesser_boon}
+                    prev_modification={player.prev?.data.lesser_boon} />
+            </div>
+            <div>
+                <h2 className={styles.unitLabel}>Modifications</h2>
+                {matchedModifications.length ? matchedModifications.map(([a, b], i) => (
+                    <ModificationDisplay
+                        key={i}
+                        modificationType="modifications"
+                        modification={a}
+                        prev_modification={b} />
+                )) : (
+                    <ModificationDisplay
+                        modificationType="modifications"
+                        modification={null}
+                        prev_modification={null} />
+
+                )}
+            </div>
             {Object.entries(data.equipment)
                 .sort(([a,], [b,]) => a < b ? -1 : 1)
                 .map(([slot, equipment], idx) => (

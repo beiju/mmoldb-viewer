@@ -2,6 +2,15 @@
     display: flex;
     min-height: 300px;
     margin-bottom: 1em;
+
+    --change-border-color: #ffe300;
+    --change-bg-color: #544f0b;
+
+    --added-border-color: #74ff00;
+    --added-bg-color: #1d5212;
+
+    --removed-border-color: #ff0000;
+    --removed-bg-color: #521212;
 }
 
 .versionsListContainer {
@@ -65,8 +74,75 @@
 
 .versionDetail {
     padding-left: 20px;
+    flex-grow: 1;
 
     li {
         margin-left: 30px;
     }
+}
+
+.versionUnitOfChange {
+    border: 1px solid rgb(101, 113, 114);
+    border-radius: 4px;
+    padding: 10px 16px;
+    background: rgb(26, 47, 48);
+}
+
+.containsInsetUnitOfChange {
+    margin-bottom: 16px;
+}
+
+.insetUnitOfChange {
+    background: rgb(26, 47, 48);
+    border: 1px solid rgb(101, 113, 114);
+    border-radius: 4px 0 4px 0;
+    padding: 10px 8px;
+    margin: -1px 8px 0 -17px;
+}
+
+.unchangedInsetInsideChangedContainer {
+    border-color: rgb(101, 113, 114) var(--change-border-color) var(--change-border-color) rgb(101, 113, 114);
+}
+
+.changed {
+    background: var(--change-bg-color);
+    border: 1px solid var(--change-border-color);
+}
+
+.removed {
+    background: var(--removed-bg-color);
+    border: 1px dashed var(--removed-border-color);
+    color: #bc7d7d;
+    text-decoration: line-through;
+}
+
+.added {
+    background: var(--added-bg-color);
+    border: 1px solid var(--added-border-color);
+}
+
+.unitLabel {
+    text-transform: uppercase;
+    margin-top: 12px;
+    font-size: 16px;
+    color: rgba(255, 255, 255, 0.6);
+}
+
+.emptyBoon {
+    color: rgba(255, 255, 255, 0.4);
+    background: transparent;
+    margin: 6px 0;
+    border-style: dashed;
+}
+
+.boon {
+    margin: 6px 0;
+
+    h3 {
+        margin-bottom: 8px;
+    }
+}
+
+.btw {
+    font-size: 14px;
 }
