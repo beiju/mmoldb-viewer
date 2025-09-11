@@ -222,3 +222,29 @@
 .starsUnknown {
     font-style: italic;
 }
+
+.datesContainer {
+    display: flex;
+    flex-wrap: wrap;
+    background: rgba(255, 255, 255, 0.05);
+    margin-bottom: 16px;
+    border-radius: 4px;
+}
+
+.validFrom {
+    text-wrap: nowrap;
+    flex: 1;
+    padding: 6px 8px;
+}
+
+.validUntil {
+    text-wrap: nowrap;
+    flex: 1;
+    padding: 6px 8px;
+    text-align: right;
+}
+
+.apiDate {
+    color: var(--text-color-deemphasized);
+    font-size: 14px;
+}

@@ -708,8 +708,12 @@ function zipMatching<T>(a: T[], b: T[]): [T | null, T | null][] {
 }
 
 function PlayerDisplay({ player }: { player: AnnotatedVersion<ApiPlayerVersion> | undefined }) {
-    if (!player) return null
+    const dateFormat = useMemo(() => new Intl.DateTimeFormat(undefined, {
+        dateStyle: "full",
+        timeStyle: "long",
+    }), [])
 
+    if (!player) return null
     const { data } = player
     const [seasonDayStr, seasonDayIsError] = displaySeasonDay(data.birthseason, data.birthday_type, data.birthday_day, data.birthday_superstar_day)
 
@@ -732,8 +736,17 @@ function PlayerDisplay({ player }: { player: AnnotatedVersion<ApiPlayerVersion> 
     const matchedEquipment = _.uniq([...Object.keys(data.equipment), ...Object.keys(player.prev?.data.equipment ?? [])]).sort()
     const matchedReports = _.uniq([...Object.keys(data.reports), ...Object.keys(player.prev?.data.reports ?? [])]).sort()
 
+    const validFrom = new Date(data.valid_from);
+    const validUntil = data.valid_until === null ? null : new Date(data.valid_until);
     return (
         <div className={styles.versionDetail}>
+            <div className={styles.datesContainer}>
+                <div className={styles.validFrom}>from {dateFormat.format(validFrom)} <span className={styles.apiDate}>{data.valid_from}</span></div>
+                {validUntil ?
+                    <div className={styles.validUntil}>to {dateFormat.format(validUntil)} <span className={styles.apiDate}>{data.valid_until}</span></div> :
+                    <div className={styles.validUntil}>to current</div>
+                }
+            </div>
             <div className={`${styles.versionUnitOfChange} ${changes.identity ? styles.changed : ""}`}>
                 <h1 className={styles.containsInsetUnitOfChange}>
                     <span className={`${styles.insetUnitOfChange} ${changes.slot ? styles.changed : ""} ${changes.identity && !changes.slot ? styles.unchangedInsetInsideChangedContainer : ""}`}>
