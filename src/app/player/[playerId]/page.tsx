@@ -281,6 +281,7 @@ function differencesLabel(version: AnnotatedVersion<ApiPlayerVersion>): string[]
 
     // Label when reports started updating live because otherwise it's confusing
     if (version.data.valid_from >= REPORTS_STARTED_LIVE_UPDATING && version.prev && version.prev.data.valid_from < REPORTS_STARTED_LIVE_UPDATING) {
+        take(["reports"])
         changes.push("Reports begin to update live")
     }
 

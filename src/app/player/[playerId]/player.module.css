@@ -1,6 +1,7 @@
 .versionsContainer {
     display: flex;
     min-height: 300px;
+    min-width: 960px;
     margin-bottom: 1em;
 
     --change-border-color: #ffe300;
@@ -15,22 +16,35 @@
 
 .versionsListContainer {
     flex: 0;
-    width: 320px;
+    width: 350px;
     /* flexbox doesn't respect width, but it does respect min-width */
-    min-width: 320px;
-    border-right: solid 1px rgba(225, 225, 225, 0.5);
+    min-width: 350px;
     padding-right: 20px;
     text-align: right;
+    position: sticky;
+    top: 12px;
+    height: calc(100vh - 24px);
+    overflow: hidden scroll;
 }
 
 .versionsList {
     list-style: none;
+    padding-right: 20px;
+    border-right: solid 1px rgba(225, 225, 225, 0.5);
+    /* I want this to be as big as possible without giving a scrollbar, which should be
+       (100vh - 24px) but for some reason I need 30px */
+    min-height: calc(100vh - 30px);
 }
 
 .versionsListItem {
     position: relative; /* so that position: absolute in the ::after is relative to this */
-    margin: 6px 0;
     cursor: pointer;
+    padding: 8px;
+    border-radius: 4px;
+
+    &:nth-child(even) {
+        background: rgba(255, 255, 255, 0.05);
+    }
 
     &::after {
         content: " ";
@@ -166,7 +180,7 @@
 
 .stars {
     font-size: 26px;
-    height: 30px;
+    height: 32px;
 
     .starsGroup1 {
         color: #ffbf00;
