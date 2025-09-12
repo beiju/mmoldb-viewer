@@ -878,7 +878,7 @@ export default function PlayerVersionsPage({
     return (<>
         {
             playerVersions ? (
-                <div className="card">
+                <div className={`card ${styles.versionsCard}`}>
                     <div className={styles.versionsContainer}>
                         <VersionsList versions={playerVersions} selectedVersion={selectedVersion}
                                       setSelectedVersion={setSelectedVersion} />
